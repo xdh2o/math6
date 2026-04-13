@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>工廠輸送帶：速率差觀察實驗室</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h2 { color: #2c3e50; }
+
+        #game-container {
+            width: 800px;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        /* 輸送帶樣式 */
+        .track {
+            height: 80px;
+            background: #dfe6e9;
+            margin: 40px 0;
+            border-radius: 10px;
+            position: relative;
+            border-bottom: 5px solid #b2bec3;
+            overflow: hidden;
+        }
+
+        .track::before {
+            content: "";
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(90deg, transparent 95%, rgba(0,0,0,0.1) 95%);
+            background-size: 50px 100%; /* 每50px一個刻度 */
+        }
+
+        /* 貨物樣式 */
+        .item {
+            width: 60px;
+            height: 40px;
+            position: absolute;
+            top: 20px;
+            left: 0;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: left 0.1s linear;
+            z-index: 2;
+        }
+
+        #item-a { background-color: #0984e3; } /* 甲：藍色 */
+        #item-b { background-color: #d63031; } /* 乙：紅色 */
+
+        /* 差距指示線 */
+        #gap-line {
+            position: absolute;
+            height: 4px;
+            background: #fdcb6e;
+            top: 115px;
+            display: none;
+            z-index: 1;
+        }
+
+        #gap-text {
+            position: absolute;
+            top: -25px;
+            width: 100%;
+            text-align: center;
+            color: #e17055;
+            font-weight: bold;
+        }
+
+        /* 控制面板 */
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            transition: transform 0.1s, background 0.3s;
+            color: white;
+        }
+
+        button:active { transform: scale(0.95); }
+        .btn-a { background: #0984e3; }
+        .btn-b { background: #d63031; }
+        .btn-both { background: #6c5ce7; }
+        .btn-reset { background: #636e72; }
+
+        /* 數據顯示 */
+        .info-panel {
+            margin-top: 20px;
+            display: flex;
+            gap: 30px;
+            font-size: 18px;
+        }
+        .stat { font-weight: bold; color: #2d3436; }
+    </style>
+</head>
+<body>
+
+    <h2>🏭 工廠輸送帶：觀察「速率差」</h2>
+    
+    <div id="game-container">
+        <div class="track" id="track-b">
+            <div id="item-b" class="item" style="display: none;">乙 (5m/s)</div>
+        </div>
+
+        <div id="gap-line"><span id="gap-text">差距: 0m</span></div>
+
+        <div class="track" id="track-a">
+            <div id="item-a" class="item" style="display: none;">甲 (3m/s)</div>
+        </div>
+
+        <div class="info-panel">
+            <div class="stat">時間: <span id="time-display">0</span> 秒</div>
+            <div class="stat">甲位置: <span id="pos-a-display">0</span> m</div>
+            <div class="stat">乙位置: <span id="pos-b-display">0</span> m</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-a" onclick="startSim('A')">1. 只有甲物品</button>
+        <button class="btn-b" onclick="startSim('B')">2. 只有乙物品</button>
+        <button class="btn-both" onclick="startSim('BOTH')">3. 甲乙一起放</button>
+        <button class="btn-reset" onclick="resetSim()">重置</button>
+    </div>
+
+    <p style="color: #636e72; margin-top: 20px;">
+        💡 提示：觀察「甲乙一起跑」時，每過一秒，他們之間的距離增加了多少？
+    </p>
+
+    <script>
+        let time = 0;
+        let timer = null;
+        const speedA = 3; // 公尺/秒
+        const speedB = 5; // 公尺/秒
+        const scale = 10; // 縮放比例：1公尺 = 10px
+
+        const itemA = document.getElementById('item-a');
+        const itemB = document.getElementById('item-b');
+        const gapLine = document.getElementById('gap-line');
+        const gapText = document.getElementById('gap-text');
+        const timeDisp = document.getElementById('time-display');
+        const posADisp = document.getElementById('pos-a-display');
+        const posBDisp = document.getElementById('pos-b-display');
+
+        function startSim(mode) {
+            resetSim();
+            
+            if (mode === 'A') itemA.style.display = 'flex';
+            if (mode === 'B') itemB.style.display = 'flex';
+            if (mode === 'BOTH') {
+                itemA.style.display = 'flex';
+                itemB.style.display = 'flex';
+                gapLine.style.display = 'block';
+            }
+
+            timer = setInterval(() => {
+                time += 0.1; // 每 0.1 秒更新一次，讓動畫順滑
+                updatePositions(mode);
+            }, 100);
+        }
+
+        function updatePositions(mode) {
+            let pA = 0, pB = 0;
+
+            if (itemA.style.display !== 'none') {
+                pA = speedA * time;
+                itemA.style.left = (pA * scale) + 'px';
+                posADisp.innerText = pA.toFixed(1);
+            }
+
+            if (itemB.style.display !== 'none') {
+                pB = speedB * time;
+                itemB.style.left = (pB * scale) + 'px';
+                posBDisp.innerText = pB.toFixed(1);
+            }
+
+            timeDisp.innerText = time.toFixed(1);
+
+            // 更新差距線
+            if (mode === 'BOTH') {
+                const gap = (pB - pA) * scale;
+                gapLine.style.left = (pA * scale + 30) + 'px'; // 30 是貨物中心修正
+                gapLine.style.width = gap + 'px';
+                gapText.innerText = `差距: ${((pB - pA)).toFixed(1)}m`;
+                
+                // 自動停止條件：為了展示方便，設為100公尺或跑出畫面
+                if ((pB - pA) >= 100) {
+                    clearInterval(timer);
+                    alert(`達成目標！當時間為 ${time.toFixed(1)} 秒時，差距來到 100 公尺！`);
+                }
+            }
+            
+            // 跑出邊界自動停止
+            if (pB * scale > 740 || pA * scale > 740) {
+                clearInterval(timer);
+            }
+        }
+
+        function resetSim() {
+            clearInterval(timer);
+            time = 0;
+            itemA.style.left = '0px';
+            itemB.style.left = '0px';
+            itemA.style.display = 'none';
+            itemB.style.display = 'none';
+            gapLine.style.display = 'none';
+            timeDisp.innerText = '0';
+            posADisp.innerText = '0';
+            posBDisp.innerText = '0';
+        }
+    </script>
+</body>
+</html>
