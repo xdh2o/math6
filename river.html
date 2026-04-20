@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>機場電扶梯：速度合成對照實驗室 (教學完整版)</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: #f5f6fa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #game-container {
+            width: 850px;
+            background: white;
+            border-radius: 20px;
+            padding: 30px 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        /* 電扶梯共通樣式 */
+        .escalator {
+            height: 70px;
+            background: #dfe6e9;
+            margin: 35px 0;
+            border-radius: 10px;
+            position: relative;
+            border: 4px solid #b2bec3;
+            overflow: hidden;
+        }
+
+        .track-label {
+            position: absolute;
+            top: -22px;
+            left: 0;
+            font-weight: bold;
+            color: #2d3436;
+            font-size: 14px;
+        }
+
+        /* 輸送帶滾動動畫 - 慢速 3s */
+        .moving-bg::after {
+            content: ">>>>>>>>> >>>>>>>>> >>>>>>>>> >>>>>>>>> >>>>>>>>>";
+            position: absolute;
+            font-size: 30px;
+            color: rgba(0,0,0,0.08);
+            white-space: nowrap;
+            top: 15px;
+            animation: scroll 3s linear infinite; 
+        }
+
+        @keyframes scroll {
+            from { transform: translateX(-150px); }
+            to { transform: translateX(0); }
+        }
+
+        .character-box {
+            position: absolute;
+            top: 5px;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .emoji { font-size: 45px; transition: transform 0.2s; }
+        
+        /* 君君面向右邊 */
+        .flip-right { transform: scaleX(-1); }
+
+        /* 君君行走時的專屬動畫 (翻轉+踏步) */
+        .walking-flipped {
+            animation: step-flipped 0.4s infinite alternate;
+        }
+
+        @keyframes step-flipped {
+            from { transform: scaleX(-1) rotate(-10deg) translateY(-2px); }
+            to { transform: scaleX(-1) rotate(10deg) translateY(0px); }
+        }
+
+        .label {
+            position: absolute;
+            top: -28px;
+            white-space: nowrap;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* 數據顯示板 */
+        .info-board {
+            display: flex;
+            justify-content: space-around;
+            background: #f1f2f6;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        /* ✨ 新增：速率資訊提示欄 */
+        .rate-hint {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 10px;
+            background: #fff9db;
+            border: 1px dashed #f1c40f;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #856404;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            background: #0984e3;
+            color: white;
+            transition: 0.2s;
+        }
+
+        button:hover { background: #00cec9; }
+        .btn-pause { background: #f39c12; }
+        .btn-reset { background: #636e72; }
+        .btn-go { background: #6c5ce7; font-weight: bold; }
+
+        .highlight { color: #d63031; font-weight: bold; }
+        .unit { font-size: 14px; color: #636e72; margin-left: 2px; }
+    </style>
+</head>
+<body>
+
+    <h2 style="margin-bottom: 20px;">✈️ 機場特攻：合速度觀念實驗室</h2>
+    
+    <div id="game-container">
+        <div id="esc-top" class="escalator">
+            <div class="track-label">【上方跑道】</div>
+            <div id="char-a" class="character-box" style="left: 0;">
+                <div class="label">小安 (靜止)</div>
+                <div id="emoji-a" class="emoji">🧍</div>
+            </div>
+        </div>
+
+        <div id="esc-bottom" class="escalator">
+            <div class="track-label">【下方跑道】</div>
+            <div id="char-b" class="character-box" style="left: 0;">
+                <div id="label-b" class="label">君君 (待命)</div>
+                <div id="emoji-b" class="emoji flip-right">🚶</div>
+            </div>
+        </div>
+
+        <div class="info-board">
+            <div>⏱ 時間: <span id="time-val" class="highlight">0.0</span> <span class="unit">分鐘</span></div>
+            <div>📏 小安: <span id="dist-a" class="highlight">0</span> <span class="unit">m</span></div>
+            <div>📏 君君: <span id="dist-b" class="highlight">0</span> <span class="unit">m</span></div>
+        </div>
+
+        <div class="rate-hint">
+            <div>⚙️ <b>電扶梯速率：</b>30 <span class="unit">公尺/分鐘</span></div>
+            <div>🏃 <b>君君走動速率：</b>40 <span class="unit">公尺/分鐘</span></div>
+        </div>
+
+        <div class="controls">
+            <button onclick="setup('A')">A. 小安站著不動 (電梯動)</button>
+            <button onclick="setup('B')">B. 君君自己走 (電梯不動)</button>
+            <button class="btn-go" onclick="setup('C')">C. 兩人同時挑戰！</button>
+            <button id="pause-btn" class="btn-pause" onclick="togglePause()" disabled>⏸ 暫停</button>
+            <button class="btn-reset" onclick="reset()">🔄 重置</button>
+        </div>
+    </div>
+
+    <script>
+        let time = 0;
+        let timer = null;
+        let isPaused = false;
+        let config = { aEsc: 0, aWalk: 0, bEsc: 0, bWalk: 0 };
+        const scale = 2;
+
+        const charA = document.getElementById('char-a');
+        const charB = document.getElementById('char-b');
+        const emojiA = document.getElementById('emoji-a');
+        const emojiB = document.getElementById('emoji-b');
+        const escTop = document.getElementById('esc-top');
+        const escBottom = document.getElementById('esc-bottom');
+        const pauseBtn = document.getElementById('pause-btn');
+
+        function setup(mode) {
+            reset();
+            pauseBtn.disabled = false;
+            
+            if (mode === 'A') {
+                config = { aEsc: 30, aWalk: 0, bEsc: 0, bWalk: 0 };
+                escTop.classList.add('moving-bg');
+            } else if (mode === 'B') {
+                config = { aEsc: 0, aWalk: 0, bEsc: 0, bWalk: 40 };
+                emojiB.className = 'emoji flip-right walking-flipped';
+                document.getElementById('label-b').innerText = "君君 (行走)";
+            } else if (mode === 'C') {
+                config = { aEsc: 30, aWalk: 0, bEsc: 30, bWalk: 40 };
+                escTop.classList.add('moving-bg');
+                escBottom.classList.add('moving-bg');
+                emojiB.className = 'emoji flip-right walking-flipped';
+                document.getElementById('label-b').innerText = "君君 (合速度)";
+            }
+            startLoop();
+        }
+
+        function startLoop() {
+            timer = setInterval(() => {
+                if (!isPaused) {
+                    time += 0.02;
+                    let distA = (config.aEsc + config.aWalk) * time;
+                    let distB = (config.bEsc + config.bWalk) * time;
+                    
+                    charA.style.left = Math.min(distA * scale, 780) + 'px';
+                    charB.style.left = Math.min(distB * scale, 780) + 'px';
+                    
+                    document.getElementById('time-val').innerText = time.toFixed(2);
+                    document.getElementById('dist-a').innerText = distA.toFixed(1);
+                    document.getElementById('dist-b').innerText = distB.toFixed(1);
+
+                    if (distB * scale >= 780 || distA * scale >= 780) clearInterval(timer);
+                }
+            }, 50);
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            pauseBtn.innerText = isPaused ? "▶ 繼續" : "⏸ 暫停";
+        }
+
+        function reset() {
+            clearInterval(timer);
+            time = 0; isPaused = false;
+            charA.style.left = '0'; charB.style.left = '0';
+            escTop.classList.remove('moving-bg');
+            escBottom.classList.remove('moving-bg');
+            emojiB.className = 'emoji flip-right';
+            document.getElementById('time-val').innerText = "0.0";
+            document.getElementById('dist-a').innerText = "0";
+            document.getElementById('dist-b').innerText = "0";
+            document.getElementById('label-b').innerText = "君君 (待命)";
+            pauseBtn.disabled = true;
+            pauseBtn.innerText = "⏸ 暫停";
+        }
+    </script>
+</body>
+</html>
